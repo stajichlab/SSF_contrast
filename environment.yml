@@ -1,0 +1,20 @@
+name: evo2_classify
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - tqdm
+  - pip:
+    - evo2
+    - torch>=2.0
+    - biopython
+    - joblib
+    - shap
+    - umap-learn

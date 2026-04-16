@@ -1,0 +1,26 @@
+[workspace]
+authors = ["Jason Stajich <jasonstajich.phd@gmail.com>"]
+channels = ["conda-forge", "main", "r", "msys2"]
+name = "evo2_classify"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = "3.10.*"
+pip = "*"
+numpy = "*"
+pandas = "*"
+scikit-learn = "*"
+matplotlib = "*"
+seaborn = "*"
+tqdm = "*"
+
+[pypi-dependencies]
+evo2 = "*"
+torch = ">=2.0"
+biopython = "*"
+joblib = "*"
+shap = "*"
+umap-learn = "*"
