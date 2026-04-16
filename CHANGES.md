@@ -1,5 +1,64 @@
 # Changelog
 
+## 2026-04-16 — Bug fixes: Evo-2 tokenizer and embedding API
+
+### Fixed
+
+- `src/embeddings.py`: `CharLevelTokenizer` is not callable like a HuggingFace tokenizer;
+  replaced `tokenizer(sequence, return_tensors="pt")["input_ids"]` with
+  `torch.tensor([tokenizer.tokenize(sequence)], dtype=torch.long)`
+- `src/embeddings.py`: `StripedHyena.forward()` does not accept `return_embeddings`;
+  the correct entry point is `Evo2.__call__()` which requires `layer_names` alongside
+  `return_embeddings=True` and returns a `dict` of tensors keyed by layer name;
+  updated `_embed_single` to call `model(input_ids, return_embeddings=True, layer_names=["norm"])`
+  and read `emb_dict["norm"]` (final RMSNorm output, shape `(batch, seq_len, hidden_dim)`)
+- `src/embeddings.py`: removed manual `_evo2_model.model.to(device)` call in `_load_evo2`;
+  Evo2/vortex handles device placement internally and the manual move broke multi-GPU configs
+
+## 2026-04-15 — Reorganised data layout
+
+### Changed
+
+- Data directory renamed from `classfiy/` to `classify/`; niche folder `Terresterial/`
+  corrected to `Terrestrial/`
+- Files within each niche are now split into type-specific subdirectories:
+  `cds/`, `dna/`, `annotation/`, `BGC/`
+- `src/data_loader.py`: `discover_genomes()` rewrote to walk the new subdir layout via
+  `_SUBDIR_ROLE` mapping (`cds/` → `cds_path`, `dna/` → `scaffolds_path`,
+  `annotation/` → `annotations_path`, `BGC/` → `clusters_path`); removed flat-file
+  suffix matching
+- `LABEL_MAP` updated from `{"Terresterial": 0, …}` to `{"Terrestrial": 0, …}`
+- `train.py` default `--data-dir` updated to `classify`
+- `README.md` and `CLAUDE.md` updated to reflect new layout
+
+## 2026-04-15 — GPU/CUDA installation notes
+
+### Added
+
+- `README.md`: documented that `transformer-engine[pytorch]` must be installed
+  separately after `pixi install` using `pip3 install --no-build-isolation` so the
+  build links against the host CUDA libraries; annotated which usage modes require this
+
+## 2026-04-15 — Bug fix: annotation feature matrix shape mismatch
+
+### Fixed
+
+- `src/annotation_features.py`: `build_annotation_matrix()` raised
+  `ValueError: all input array dimensions must match` because Terrestrial genomes
+  (no `.annotations.txt`) produced ~25 features while annotated Subsurface genomes
+  produced 102, making `np.vstack()` fail
+- Fix 1: `annotation_feature_vector()` now initialises every possible feature key to 0
+  at the top of the function regardless of which files are present, so all records
+  always return the same complete key set
+- Fix 2: `build_annotation_matrix()` switched to a two-pass approach — first collect
+  per-record dicts, then align to the sorted union of all names with zero-fill for
+  missing keys — as a structural safeguard against any future key-set divergence
+
+### Added
+
+- `README.md` — user-facing guide (installation, usage, options table, architecture)
+- `CHANGES.md` — this file
+
 ## 2026-04-15 — Initial codebase
 
 ### Added
@@ -7,8 +66,8 @@
 **`src/data_loader.py`**
 - `GenomeRecord` dataclass: holds paths to all file types per genome with lazy loaders
   (`load_scaffolds()`, `load_cds()`, `load_annotations()`, `load_clusters()`)
-- `discover_genomes(data_dir)`: walks `Subsurface/` and `Terresterial/` subdirectories,
-  matches files by suffix, and returns one `GenomeRecord` per genome
+- `discover_genomes(data_dir)`: walks niche subdirectories and type-specific subdirs
+  (`cds/`, `dna/`, `annotation/`, `BGC/`), returning one `GenomeRecord` per genome
 - `summarize_dataset()`: prints class counts and imbalance ratio
 
 **`src/annotation_features.py`**

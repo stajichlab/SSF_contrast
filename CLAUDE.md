@@ -60,8 +60,9 @@ src/
   data_loader.py          Discovers genomes; GenomeRecord dataclass with lazy loaders
   embeddings.py           Evo-2 embedding extraction; tiles long scaffolds into windows;
                           caches per-genome .npy files in models/embeddings/
-  annotation_features.py  CAZyme counts, COG frequencies, secretome, BGC types →
-                          numeric feature vector from annotations.txt + clusters.txt
+  annotation_features.py  CAZyme classes, secretome (SignalP), membrane (TMHMM),
+                          protease (MEROPS), PFAM coverage → numeric feature vector
+                          from annotation_summary TSV files
   classifier.py           sklearn Pipeline (StandardScaler + LogisticRegression/MLP);
                           save/load via pickle; handles class imbalance with balanced weights
   features.py             Feature importance: logistic coefficients, permutation importance,
@@ -72,9 +73,14 @@ predict.py                Inference on new FASTA files (whole genome or short re
 models/                   Saved pipelines (pipeline.pkl) and metadata (metadata.json)
 results/                  Plots and CSVs produced by train.py
 classify/
-  Subsurface/             5 cave fungi: *.scaffolds.fa, *.cds-transcripts.fa,
-                          *.annotations.txt, *.clusters.txt
-  Terresterial/           191 surface fungi: *.scaffolds.fa, *.cds-transcripts.fa
+  Subsurface/             5 cave fungi
+    cds/                  *.cds-transcripts.fa  (primary embedding source)
+    dna/                  *.scaffolds.fa
+    annotation_summary/   *.annotation_summary.tsv
+  Terrestrial/            191 surface fungi
+    cds/                  *.cds-transcripts.fa
+    dna/                  *.scaffolds.fa
+    annotation_summary/   *.annotation_summary.tsv
 ```
 
 ## Key design decisions
@@ -83,17 +89,13 @@ classify/
 - **Three feature modes**: `annotation` (no GPU, fast), `embedding` (Evo-2 only), `hybrid` (both concatenated).
 - **Embedding caching**: computed embeddings are stored as `.npy` files keyed by `{genome_name}.{seq_type}.npy`; reuse across training runs with `--embedding-cache`.
 - **Genome tiling**: scaffolds are chunked into overlapping `chunk_size`-bp windows (default 8192 bp, 50% overlap); per-window embeddings are mean-pooled to a single genome vector.
-- **Annotation features**: CAZyme class counts (GH/GT/PL/CE/AA/CBM), COG categories, secreted/membrane/protease rates, antiSMASH BGC types, BUSCO hit density, GO term category counts — all normalized by gene count to produce per-genome rates.
+- **Annotation features**: sourced from `annotation_summary/` TSVs; CAZyme class counts (GH/GT/PL/CE/AA/CBM), secreted gene count (SignalP prob > 0.5), membrane proteins (TMHMM helices > 0), protease count (MEROPS hit), PFAM-annotated gene count — all normalized by gene count to produce per-genome rates.
 - **Evo-2 API**: package `evo2` exposes `Evo2(model_name)` with a `.model` attribute and `.tokenizer`; forward pass with `return_embeddings=True` returns `(logits, embeddings)`.
 
 ## Data file types
 
-| Suffix | Content |
-|---|---|
-| `.scaffolds.fa` | Genome assembly (nuclear scaffolds) |
-| `.cds-transcripts.fa` / `.mrna-transcripts.fa` | CDS/mRNA sequences (primary sequences for embedding) |
-| `.annotations.txt` | TSV: GeneID, Product, PFAM, COG, GO Terms, CAZyme, antiSMASH, Secreted, … |
-| `.clusters.txt` | antiSMASH biosynthetic gene cluster table (secondary metabolites) |
-| `.fcs_gx-taxonomy.tsv` | FCS-GX contamination taxonomy (some Terrestrial only, not used in classifier) |
-
-Note: `classify/Terresterial/` is a typo in the directory name — do not rename it.
+| Subdir | Suffix | Content |
+|---|---|---|
+| `cds/` | `.cds-transcripts.fa` | CDS sequences — primary input for Evo-2 embedding |
+| `dna/` | `.scaffolds.fa` | Genome assembly scaffolds |
+| `annotation_summary/` | `.annotation_summary.tsv` | TSV: protein_id, pfam_domains, signalp_{start,end,prob}, merops_{id,pct_id,evalue}, tmhmm_{pred_hel,exp_aa,topology}, cazy_{family,EC,substrate} |

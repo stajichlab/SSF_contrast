@@ -1,9 +1,13 @@
 [workspace]
 authors = ["Jason Stajich <jasonstajich.phd@gmail.com>"]
-channels = ["conda-forge", "main", "r", "msys2"]
+channels = ["conda-forge", "main", "r", "msys2", "https://conda.anaconda.org/nvidia"]
 name = "evo2_classify"
 platforms = ["linux-64"]
 version = "0.1.0"
+
+[activation]
+env = { NVTE_FRAMEWORK = "pytorch" }
+#, CPATH = "/opt/linux/rocky/8.x/x86_64/pkgs/cudnn/9.11.0.98/include:/opt/linux/rocky/8.x/x86_64/pkgs/nccl/2.18.1-1/include", LIBRARY_PATH = "/opt/linux/rocky/8.x/x86_64/pkgs/cudnn/9.11.0.98/lib:/opt/linux/rocky/8.x/x86_64/pkgs/nccl/2.18.1-1/lib", LD_LIBRARY_PATH = "/opt/linux/rocky/8.x/x86_64/pkgs/cudnn/9.11.0.98/lib:/opt/linux/rocky/8.x/x86_64/pkgs/nccl/2.18.1-1/lib" }
 
 [tasks]
 
@@ -16,6 +20,7 @@ scikit-learn = "*"
 matplotlib = "*"
 seaborn = "*"
 tqdm = "*"
+cuda-version = "12.8.*"
 
 [pypi-dependencies]
 evo2 = "*"

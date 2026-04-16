@@ -7,14 +7,22 @@ future runs — including short-read metagenome data — can skip the embedding 
 
 ## Data
 
-Genome files live under `classify/`:
+Genome files live under `classify/`, organised by niche and data type:
 
-| Directory | Genomes | File types |
-|---|---|---|
-| `classify/Subsurface/` | 5 cave fungi | `.scaffolds.fa`, `.cds-transcripts.fa`, `.annotations.txt`, `.clusters.txt` |
-| `classify/Terresterial/` | 193 surface fungi | `.scaffolds.fa`, `.cds-transcripts.fa` |
+```
+classify/
+  Subsurface/       (5 cave fungi)
+    cds/            *.cds-transcripts.fa
+    dna/            *.scaffolds.fa
+    annotation/     *.annotations.txt
+    BGC/            *.clusters.txt
+  Terrestrial/      (191 surface fungi)
+    cds/            *.cds-transcripts.fa
+    dna/            *.scaffolds.fa
+```
 
-> The `Terresterial/` spelling is intentional in the directory name — do not rename it.
+Terrestrial genomes currently have no `annotation/` or `BGC/` subdirectories;
+annotation features for those records are set to zero.
 
 ## Installation
 
@@ -32,6 +40,21 @@ curl -fsSL https://pixi.sh/install.sh | bash
 cd SSF_contrast
 pixi install
 ```
+
+### GPU/CUDA dependencies (required for Evo-2 embedding)
+
+Evo-2 depends on `transformer-engine` and `flash-attn`, both of which must be compiled
+against the system CUDA installation.  After `pixi install`, run:
+
+```bash
+pixi run pip3 install --no-build-isolation "transformer-engine[pytorch]"
+pixi run pip install flash-attn --no-build-isolation
+```
+
+`--no-build-isolation` is required so the build process links against the CUDA libraries
+already present on the host.  Verify `nvcc` is on `PATH` before building (`which nvcc`).
+These steps are only needed for embedding or hybrid mode; the annotation-only baseline
+has no GPU dependency.
 
 All subsequent commands should be prefixed with `pixi run` to use the managed
 environment, or run inside a shell activated with `pixi shell`.
