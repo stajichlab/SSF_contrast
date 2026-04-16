@@ -40,7 +40,6 @@ def _load_evo2(model_name: str = "evo2_1b_base", device: Optional[str] = None):
             device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"[embeddings] Loading Evo-2 model '{model_name}' on {device} …")
         _evo2_model = Evo2(model_name)
-        _evo2_model.model = _evo2_model.model.to(device)
         _evo2_model.model.eval()
         _evo2_tokenizer = _evo2_model.tokenizer
         print("[embeddings] Model ready.")
@@ -57,12 +56,13 @@ def _embed_single(sequence: str, model, tokenizer, device: str) -> np.ndarray:
     Returns a 1-D numpy array of shape (hidden_dim,).
     """
     sequence = sequence.upper().replace("N", "A")  # simple N-masking
-    input_ids = tokenizer(sequence, return_tensors="pt")["input_ids"].to(device)
-    with torch.no_grad():
-        # Evo-2 forward: returns (logits, hidden_states) when return_embeddings=True
-        _, embeddings = model.model(input_ids, return_embeddings=True)
-        # embeddings shape: (batch, seq_len, hidden_dim)  — mean-pool over seq_len
-        vec = embeddings[0].mean(dim=0).float().cpu().numpy()
+    token_ids = tokenizer.tokenize(sequence)
+    input_ids = torch.tensor([token_ids], dtype=torch.long).to(device)
+    # Evo2.forward() uses hooks; layer_names picks which layer to capture.
+    # "norm" is the final RMSNorm before the unembedding head.
+    _, emb_dict = model(input_ids, return_embeddings=True, layer_names=["norm"])
+    # emb_dict["norm"] shape: (batch, seq_len, hidden_dim) — mean-pool over seq_len
+    vec = emb_dict["norm"][0].mean(dim=0).float().cpu().numpy()
     return vec
 
 
