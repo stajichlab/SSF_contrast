@@ -11,18 +11,24 @@ Genome files live under `classify/`, organised by niche and data type:
 
 ```
 classify/
-  Subsurface/       (5 cave fungi)
-    cds/            *.cds-transcripts.fa
-    dna/            *.scaffolds.fa
-    annotation/     *.annotations.txt
-    BGC/            *.clusters.txt
-  Terrestrial/      (191 surface fungi)
-    cds/            *.cds-transcripts.fa
-    dna/            *.scaffolds.fa
+  Subsurface/               (5 cave fungi)
+    cds/                    *.cds-transcripts.fa
+    dna/                    *.scaffolds.fa
+    annotation_summary/     *.annotation_summary.tsv[.gz]
+  Terrestrial/              (191 surface fungi)
+    cds/                    *.cds-transcripts.fa
+    dna/                    *.scaffolds.fa
+    annotation_summary/     *.annotation_summary.tsv[.gz]
 ```
 
-Terrestrial genomes currently have no `annotation/` or `BGC/` subdirectories;
-annotation features for those records are set to zero.
+Each `annotation_summary` TSV contains one row per protein with columns:
+`protein_id`, `pfam_domains`, `signalp_start/end/prob`, `merops_id/pct_id/evalue`,
+`tmhmm_pred_hel/exp_aa/topology`, `cazy_family/EC/substrate`.
+Both uncompressed `.tsv` and gzip-compressed `.tsv.gz` files are supported.
+
+The `pfam_domains` column holds pipe-delimited `PF_ACC:PF_NAME:EVALUE` tokens; a single
+protein may carry several domains and the same accession may appear more than once
+(multiple hit regions along the sequence).
 
 ## Installation
 
@@ -63,15 +69,35 @@ environment, or run inside a shell activated with `pixi shell`.
 
 ### 1. Annotation-only baseline (no GPU required)
 
-Builds a classifier from CAZyme profiles, COG categories, secretome content, and
-biosynthetic gene cluster types. Only the 5 Subsurface genomes have full annotation
-files; Terrestrial genomes receive zeros for annotation features.
+Builds a classifier from functional annotation features derived from
+`annotation_summary` TSV files:
+
+- **CAZyme classes** — GH, GT, PL, CE, AA, CBM counts and rates
+- **Secretome** — SignalP probability > 0.5
+- **Membrane proteins** — TMHMM predicted helices > 0
+- **Proteases** — MEROPS family hit
+- **PFAM scalar features** — proteins with ≥1 domain, total domain instances, unique
+  accessions, average domains per annotated protein, multi-domain protein count
+- **Per-PFAM-family features** — for every domain accession present in ≥2 genomes,
+  the count and rate of proteins carrying that domain (5 976 families in the current
+  dataset, giving ~11 982 features total)
 
 ```bash
 pixi run python train.py \
     --mode annotation \
     --data-dir classify \
     --model-dir models/annotation
+```
+
+Annotation loading is parallelised across 8 threads by default.  Adjust with
+`--n-workers`:
+
+```bash
+pixi run python train.py \
+    --mode annotation \
+    --data-dir classify \
+    --model-dir models/annotation \
+    --n-workers 16
 ```
 
 ### 2. Evo-2 embeddings (GPU recommended)
@@ -101,7 +127,36 @@ pixi run python train.py \
     --embedding-cache models/embeddings
 ```
 
-### 4. Classify new genomes
+### 4. Explain the annotation classifier with SHAP
+
+After training an annotation model, generate a full SHAP interpretability report:
+
+```bash
+pixi run python explain_annotation.py \
+    --model-dir models/annotation \
+    --data-dir classify \
+    --results-dir results \
+    --top-dependence 5
+```
+
+Outputs written to `results/`:
+
+| File | Description |
+|---|---|
+| `shap_beeswarm.png` | Per-sample SHAP values coloured by feature value |
+| `shap_bar.png` | Mean \|SHAP\| global feature ranking |
+| `shap_waterfall_<name>.png` | Waterfall for each Subsurface genome (5 plots) |
+| `shap_dependence_<feat>.png` | SHAP vs raw value for top-N features |
+| `shap_values.csv` | Full SHAP matrix (genome × feature) |
+| `shap_class_means.csv` | Mean SHAP per class per feature |
+| `logistic_coefficients.csv/.png` | LR weights (logistic model only) |
+| `permutation_importance.csv/.png` | Balanced-accuracy drop per feature |
+
+A formatted summary table is also printed to stdout showing each feature's mean |SHAP|,
+class-directional sign, and the top-3 driving features for each individual Subsurface
+genome.
+
+### 5. Classify new genomes
 
 ```bash
 # Single FASTA
@@ -116,7 +171,7 @@ pixi run python predict.py \
     --out results/predictions.csv
 ```
 
-### 5. Classify metagenome short reads
+### 6. Classify metagenome short reads
 
 ```bash
 pixi run python predict.py \
@@ -137,6 +192,7 @@ pixi run python predict.py \
 | `--embedding-cache` | `models/embeddings` | Directory for cached `.npy` embedding files |
 | `--overwrite-embeddings` | off | Re-compute embeddings even if cache exists |
 | `--results-dir` | `results` | Output directory for plots and CSVs |
+| `--n-workers` | `8` | Threads for parallel annotation TSV loading (annotation and hybrid modes) |
 
 ## Outputs
 
@@ -157,12 +213,28 @@ After training, `models/<name>/` contains:
 src/
   data_loader.py          GenomeRecord dataclass; discovers genomes from classify/
   embeddings.py           Evo-2 tiling, pooling, and .npy caching
-  annotation_features.py  105-feature functional annotation vectors
-  classifier.py           sklearn pipeline; balanced class weights; save/load
-  features.py             Coefficients, permutation importance, SHAP, UMAP
+  annotation_features.py  Scalar annotation features + per-PFAM-family features from
+                          annotation_summary TSVs; two-pass matrix build with
+                          cross-genome PFAM vocabulary; parallel loading via
+                          ThreadPoolExecutor
+  classifier.py           sklearn pipeline; balanced class weights; parallel CV; save/load
+  features.py             Coefficients, permutation importance (parallel), SHAP, UMAP
 train.py                  Training pipeline
 predict.py                Inference on new FASTA files
+explain_annotation.py     SHAP-based explanation of the annotation classifier;
+                          beeswarm, bar, waterfall, and dependence plots + CSV exports
 ```
+
+## Parallelism
+
+| Stage | Mechanism | Controlled by |
+|---|---|---|
+| Annotation TSV loading | `ThreadPoolExecutor` (I/O-bound) | `--n-workers` (default 8) |
+| Cross-validation folds | sklearn `n_jobs=-1` (all CPUs) | automatic |
+| Permutation importance | sklearn `n_jobs=-1` (all CPUs) | automatic |
+
+Evo-2 embedding is GPU-bound and runs serially on a single GPU; the per-genome
+embedding cache (`.npy` files) avoids redundant GPU work across training runs.
 
 ## Notes on class imbalance
 

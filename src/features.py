@@ -70,7 +70,7 @@ def permutation_importance(
 
     scorer = make_scorer(balanced_accuracy_score)
     result = sk_perm_imp(
-        pipeline, X, y, n_repeats=n_repeats, random_state=42, scoring=scorer
+        pipeline, X, y, n_repeats=n_repeats, random_state=42, scoring=scorer, n_jobs=-1
     )
     df = pd.DataFrame(
         {
@@ -139,7 +139,9 @@ def plot_umap(
     title: str = "Evo-2 genome embeddings (UMAP)",
 ) -> None:
     """
-    Reduce embedding matrix to 2-D with UMAP and plot colored by label.
+    Reduce embedding matrix to 2-D with UMAP and save two plots:
+      1. output_path              — subsurface points labeled only
+      2. output_path stem + _all_labeled suffix — all points labeled
     """
     import umap
 
@@ -150,14 +152,20 @@ def plot_umap(
     colors = {0: "#1f77b4", 1: "#d62728"}  # blue=Terrestrial, red=Subsurface
     label_names = {0: "Terrestrial", 1: "Subsurface"}
 
+    def _scatter(ax):
+        for lbl in sorted(set(labels)):
+            mask = label_arr == lbl
+            ax.scatter(
+                coords[mask, 0], coords[mask, 1],
+                c=colors[lbl], label=label_names[lbl], alpha=0.7, s=60,
+            )
+        ax.set_xlabel("UMAP-1")
+        ax.set_ylabel("UMAP-2")
+        ax.legend()
+
+    # --- Plot 1: subsurface labels only ---
     fig, ax = plt.subplots(figsize=(9, 7))
-    for lbl in sorted(set(labels)):
-        mask = label_arr == lbl
-        ax.scatter(
-            coords[mask, 0], coords[mask, 1],
-            c=colors[lbl], label=label_names[lbl], alpha=0.7, s=60,
-        )
-    # Annotate subsurface points (few, so visible)
+    _scatter(ax)
     for i, (name, lbl) in enumerate(zip(names, labels)):
         if lbl == 1:
             ax.annotate(
@@ -165,13 +173,27 @@ def plot_umap(
                 fontsize=7, xytext=(4, 4), textcoords="offset points",
             )
     ax.set_title(title)
-    ax.legend()
-    ax.set_xlabel("UMAP-1")
-    ax.set_ylabel("UMAP-2")
     plt.tight_layout()
     plt.savefig(str(output_path), dpi=150)
     plt.close()
     print(f"[features] UMAP plot saved to {output_path}")
+
+    # --- Plot 2: all points labeled ---
+    output_path = Path(output_path)
+    labeled_path = output_path.with_stem(output_path.stem + "_all_labeled")
+    fig, ax = plt.subplots(figsize=(14, 11))
+    _scatter(ax)
+    for i, (name, lbl) in enumerate(zip(names, labels)):
+        ax.annotate(
+            name, (coords[i, 0], coords[i, 1]),
+            fontsize=5, xytext=(3, 3), textcoords="offset points",
+            color=colors[lbl],
+        )
+    ax.set_title(title + " (all labeled)")
+    plt.tight_layout()
+    plt.savefig(str(labeled_path), dpi=150)
+    plt.close()
+    print(f"[features] UMAP plot (all labeled) saved to {labeled_path}")
 
 
 # ---------------------------------------------------------------------------

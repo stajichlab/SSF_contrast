@@ -100,7 +100,7 @@ def train(
 
     scoring = ["balanced_accuracy", "f1", "roc_auc", "average_precision"]
     cv_results = cross_validate(
-        pipeline, X, y, cv=cv, scoring=scoring, return_train_score=True
+        pipeline, X, y, cv=cv, scoring=scoring, return_train_score=True, n_jobs=-1
     )
 
     metrics = {
@@ -167,7 +167,7 @@ def load_model(model_dir: str | Path) -> Tuple[Pipeline, dict]:
 # ---------------------------------------------------------------------------
 
 def print_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_proba: np.ndarray) -> None:
-    from data_loader import LABEL_NAMES  # local import to avoid circular
+    from .data_loader import LABEL_NAMES
     target_names = [LABEL_NAMES[0], LABEL_NAMES[1]]
     print(classification_report(y_true, y_pred, target_names=target_names,
                                 zero_division=0))

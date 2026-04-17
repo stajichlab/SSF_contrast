@@ -1,5 +1,90 @@
 # Changelog
 
+## 2026-04-16 — SHAP explanation script and richer PFAM annotation features
+
+### Added
+
+- `explain_annotation.py`: standalone script that loads a trained annotation model,
+  rebuilds the feature matrix, and produces a full SHAP-based interpretability report:
+  - `results/shap_beeswarm.png` — per-sample SHAP values coloured by feature value
+  - `results/shap_bar.png` — mean |SHAP| global feature ranking
+  - `results/shap_waterfall_<name>.png` — per-genome waterfall for each Subsurface sample
+  - `results/shap_dependence_<feat>.png` — SHAP vs raw value for top-N features
+  - `results/shap_values.csv` — full SHAP matrix (genome × feature)
+  - `results/shap_class_means.csv` — mean SHAP per class per feature
+  - `results/logistic_coefficients.csv/.png` — LR weights (if logistic model)
+  - `results/permutation_importance.csv/.png`
+  - Formatted text table printed to stdout: mean |SHAP|, class-directional sign, and
+    top-3 driving features per Subsurface genome
+  - Supports logistic regression (LinearExplainer) and MLP (KernelExplainer)
+  - Usage: `pixi run python explain_annotation.py --model-dir models/annotation`
+
+- `src/annotation_features._parse_pfam()`: replaces the old `_count_pfam()` with a
+  full parser for the pipe-delimited `PF_ACC:PF_NAME:EVALUE` format; correctly handles
+  multiple domains per protein and repeated accessions (multiple hit regions); returns
+  five new scalar features per genome:
+  - `total_pfam_domains` — total domain instances (counting duplicates)
+  - `unique_pfam_accessions` — distinct PF_ACC values in the genome
+  - `avg_domains_per_annotated_protein` — mean domain load per annotated protein
+  - `multi_domain_proteins` — proteins carrying >1 distinct domain family
+  - `pfam_annotated` retained (proteins with ≥1 domain)
+
+- `src/annotation_features.build_annotation_matrix()`: extended to a two-pass build
+  that adds per-PFAM-family features across all genomes:
+  - Pass 1: parse every genome in parallel; collect scalar stats and per-protein domain sets
+  - Vocabulary step: retain accessions appearing in ≥`min_genome_freq` genomes (default 2);
+    6 366 accessions found in the current dataset, 5 976 retained
+  - Pass 2: for each vocabulary accession, add `pfam_<ACC>_count` (proteins carrying that
+    domain, deduplicated per protein) and `pfam_<ACC>_rate` (/ gene_count)
+  - Full feature matrix grows from 23 scalars to ~11 982 features (30 scalar + 11 952
+    per-family); `min_genome_freq` parameter controls vocabulary size
+
+### Changed
+
+- `src/annotation_features.annotation_feature_vector()`: updated to use `_parse_pfam()`
+  and include the four new PFAM scalar features; per-family features are not included
+  here (they require a cross-genome vocabulary — use `build_annotation_matrix()`)
+
+## 2026-04-16 — Multithreading and bug fix
+
+### Added
+
+- `src/annotation_features.build_annotation_matrix()`: parallel TSV loading via
+  `ThreadPoolExecutor`; genome reads are I/O-bound and independent, so wall time
+  drops roughly proportionally to thread count up to ~8 threads; controlled by the
+  new `n_workers` parameter (default 8)
+- `train.py`: `--n-workers N` flag (default 8) sets the thread count for annotation
+  loading; passed through to both annotation-only and hybrid modes
+- `src/classifier.cross_validate()`: `n_jobs=-1` so CV folds run in parallel across
+  all available CPUs via sklearn's joblib backend
+- `src/features.permutation_importance()`: `n_jobs=-1` so the 30 permutation repeats
+  run in parallel
+
+### Fixed
+
+- `src/classifier.print_metrics()`: `from data_loader import LABEL_NAMES` raised
+  `ModuleNotFoundError`; corrected to relative import `from .data_loader import LABEL_NAMES`
+
+## 2026-04-16 — Annotation format migration to annotation_summary TSV
+
+### Changed
+
+- Data layout: `annotation/` and `BGC/` subdirectories replaced by
+  `annotation_summary/` containing `*.annotation_summary.tsv[.gz]` files with columns
+  `protein_id`, `pfam_domains`, `signalp_{start,end,prob}`, `merops_{id,pct_id,evalue}`,
+  `tmhmm_{pred_hel,exp_aa,topology}`, `cazy_{family,EC,substrate}`
+- `src/data_loader.py`: `GenomeRecord` fields `annotations_path` and `clusters_path`
+  replaced by `annotation_summary_path`; `load_annotations()` / `load_clusters()`
+  replaced by `load_annotation_summary()`; `_SUBDIR_ROLE` updated accordingly;
+  `_stem()` strips `.annotation_summary.tsv` and `.annotation_summary.tsv.gz`;
+  `discover_genomes()` accepts `.gz` suffix; `pd.read_csv` uses `compression="infer"`
+  so gzip files are transparently decompressed
+- `src/annotation_features.py`: fully rewritten for the new TSV format; feature set
+  reduced from 105 COG/BUSCO/GO/BGC features to 23 focused features — CAZyme class
+  counts (GH/GT/PL/CE/AA/CBM), secreted (SignalP prob > 0.5), membrane (TMHMM
+  helices > 0), protease (MEROPS hit), PFAM-annotated gene count, plus gene-count-
+  normalised rates for each
+
 ## 2026-04-16 — Bug fixes: Evo-2 tokenizer and embedding API
 
 ### Fixed

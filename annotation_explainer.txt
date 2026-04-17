@@ -1,0 +1,109 @@
+[explain] Loading model from models/annotation
+          classifier type : logistic
+          feature mode    : annotation
+
+[explain] Discovering genomes in classify …
+Dataset: 196 genomes  (Subsurface=5, Terrestrial=191)
+  Class imbalance ratio: 1:38.2  (use class_weight='balanced' in classifiers)
+
+[explain] Building annotation feature matrix …
+          196 samples × 23 features
+
+[explain] Logistic regression coefficients …
+
+Feature                       Coefficient
+------------------------------------------
+  pfam_annotated_rate           +0.8616  → Subsurface
+  membrane_rate                 +0.8171  → Subsurface
+  protease_rate                 -0.6959  → Terrestrial
+  secreted_rate                 +0.5641  → Subsurface
+  secreted                      +0.5619  → Subsurface
+  AA_rate                       -0.4174  → Terrestrial
+  GT_rate                       -0.3859  → Terrestrial
+  total_cazyme_rate             -0.3795  → Terrestrial
+  GH_rate                       -0.3106  → Terrestrial
+  CE                            +0.2509  → Subsurface
+  CBM                           +0.2409  → Subsurface
+  membrane                      +0.2352  → Subsurface
+  AA                            -0.1983  → Terrestrial
+  GT                            -0.1535  → Terrestrial
+  protease                      -0.1533  → Terrestrial
+  pfam_annotated                +0.1452  → Subsurface
+  GH                            -0.1354  → Terrestrial
+  CBM_rate                      +0.1307  → Subsurface
+  PL_rate                       -0.1306  → Terrestrial
+  total_cazyme                  -0.1136  → Terrestrial
+  gene_count                    +0.0921  → Subsurface
+  CE_rate                       +0.0751  → Subsurface
+  PL                            +0.0496  → Subsurface
+[features] Feature plot saved to results/logistic_coefficients.png
+
+[explain] Permutation importance (n_repeats=30) …
+/bigdata/stajichlab/shared/projects/CIFAR_E4D/SSF_contrast/.pixi/envs/default/lib/python3.10/site-packages/shap/explainers/_linear.py:99: FutureWarning: The feature_perturbation option is now deprecated in favor of using the appropriate masker (maskers.Independent, maskers.Partition or maskers.Impute).
+  warnings.warn(wmsg, FutureWarning)
+[features] Feature plot saved to results/permutation_importance.png
+
+[explain] Computing SHAP values …
+          explainer type: linear
+[explain] SHAP values   → results/shap_values.csv
+
+========================================================================
+  SHAP FEATURE IMPORTANCE SUMMARY
+  Positive SHAP → pushes toward Subsurface
+  Negative SHAP → pushes toward Terrestrial
+========================================================================
+Feature                        |SHAP|    Subsurface   Terrestrial
+------------------------------------------------------------------------
+membrane_rate                  0.6076       +1.2657       -0.0374  ↑Sub
+pfam_annotated_rate            0.5820       -0.2918       +0.0913  ↑Ter
+protease_rate                  0.5202       +0.4632       +0.0390  ↑Sub
+secreted                       0.4012       +0.6563       -0.0295  ↑Sub
+secreted_rate                  0.3802       +0.3772       -0.0192  ↑Sub
+AA_rate                        0.3061       -0.1476       -0.0119  ↑Ter
+GT_rate                        0.2885       +0.4136       -0.0224  ↑Sub
+total_cazyme_rate              0.2729       +0.1993       -0.0150  ↑Sub
+GH_rate                        0.2300       +0.2080       -0.0099  ↑Sub
+CBM                            0.1762       +0.0894       -0.0048  ↑Sub
+CE                             0.1657       +0.2197       -0.0091  ↑Sub
+membrane                       0.1520       +0.2848       -0.0118  ↑Sub
+AA                             0.1448       -0.1580       +0.0021  ↑Ter
+PL_rate                        0.1020       -0.0536       -0.0044  ↑Ter
+GH                             0.1012       +0.0022       -0.0009  ↑Sub
+CBM_rate                       0.0993       -0.0018       -0.0009  ↑Ter
+protease                       0.0989       -0.1011       +0.0071  ↑Ter
+pfam_annotated                 0.0888       +0.1359       -0.0038  ↑Sub
+GT                             0.0857       -0.0396       -0.0049  ↑Ter
+total_cazyme                   0.0817       -0.0368       -0.0003  ↑Ter
+gene_count                     0.0573       +0.0880       -0.0031  ↑Sub
+CE_rate                        0.0525       +0.0279       -0.0009  ↑Sub
+PL                             0.0359       +0.0403       +0.0005  ↑Sub
+========================================================================
+
+  TOP-3 DRIVING FEATURES — SUBSURFACE GENOMES
+------------------------------------------------------------------------
+  Acremonium_sp._AntShAcr              secreted: +2.669,  membrane_rate: +2.445,  pfam_annotated_rate: -2.015
+  Exophiala_sp._AntShExo               pfam_annotated_rate: +1.491,  membrane_rate: +1.413,  secreted_rate: -1.133
+  Paracremonium_sp._AntShPar           membrane_rate: +1.478,  total_cazyme_rate: +0.937,  pfam_annotated_rate: -0.848
+  Penicillium_sp._AntShPen             pfam_annotated_rate: +1.623,  total_cazyme_rate: -0.310,  GH_rate: -0.308
+  Scedosporium_sp._PT110               pfam_annotated_rate: -1.710,  protease_rate: +1.382,  secreted_rate: +1.262
+========================================================================
+
+[explain] Class means   → results/shap_class_means.csv
+[explain] Beeswarm plot → results/shap_beeswarm.png
+[explain] Bar plot      → results/shap_bar.png
+
+[explain] Waterfall plots for 5 Subsurface genome(s) …
+[explain] Waterfall     → results/shap_waterfall_Acremonium_sp._AntShAcr.png
+[explain] Waterfall     → results/shap_waterfall_Exophiala_sp._AntShExo.png
+[explain] Waterfall     → results/shap_waterfall_Paracremonium_sp._AntShPar.png
+[explain] Waterfall     → results/shap_waterfall_Penicillium_sp._AntShPen.png
+[explain] Waterfall     → results/shap_waterfall_Scedosporium_sp._PT110.png
+
+[explain] Dependence plots for top-5 features …
+[explain] Dependence    → results/shap_dependence_membrane_rate.png
+[explain] Dependence    → results/shap_dependence_pfam_annotated_rate.png
+[explain] Dependence    → results/shap_dependence_protease_rate.png
+[explain] Dependence    → results/shap_dependence_secreted.png
+[explain] Dependence    → results/shap_dependence_secreted_rate.png
+
+[explain] Done. All outputs written to results/

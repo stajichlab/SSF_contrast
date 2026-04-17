@@ -77,6 +77,10 @@ def parse_args():
         "--results-dir", default="results",
         help="Directory for plots and reports",
     )
+    p.add_argument(
+        "--n-workers", type=int, default=8,
+        help="Threads for parallel annotation TSV loading (default: 8)",
+    )
     return p.parse_args()
 
 
@@ -86,7 +90,7 @@ def build_feature_matrix(args, records):
     y = np.array(labels)
 
     if args.mode == "annotation":
-        X, feature_names, _ = build_annotation_matrix(records)
+        X, feature_names, _ = build_annotation_matrix(records, n_workers=args.n_workers)
         return X, y, feature_names
 
     # Load / compute Evo-2 embeddings
@@ -114,7 +118,7 @@ def build_feature_matrix(args, records):
         return emb_matrix, valid_labels, emb_feature_names
 
     # Hybrid: concatenate annotation features
-    ann_X, ann_names, _ = build_annotation_matrix(valid_records)
+    ann_X, ann_names, _ = build_annotation_matrix(valid_records, n_workers=args.n_workers)
     X = np.hstack([emb_matrix, ann_X])
     feature_names = emb_feature_names + ann_names
     return X, valid_labels, feature_names
