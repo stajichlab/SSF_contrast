@@ -128,7 +128,7 @@ def main():
     args = parse_args()
     data_dir = Path(args.data_dir)
     model_dir = Path(args.model_dir)
-    results_dir = Path(args.results_dir)
+    results_dir = Path(args.results_dir) / args.mode
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- Discover data ----
